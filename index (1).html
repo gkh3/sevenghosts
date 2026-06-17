@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Image Ranker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #1a0015;
+      --surface: #2d0025;
+      --accent: #ff2d8a;
+      --accent-glow: rgba(255, 45, 138, 0.45);
+      --pink-light: #ff80c0;
+      --gold: #ffd700;
+      --text: #ffe6f4;
+      --muted: #d98fba;
+      --border: #7a1a5a;
+      --win: #ff2d8a;
+    }
+
+    /* ── SPARKLE CANVAS ───────────────────────────────── */
+    #sparkle-canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body {
+      background: linear-gradient(135deg, #1a0015 0%, #2d0030 50%, #1a0020 100%);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    body > * { position: relative; z-index: 1; }
+
+    /* ── HEADER ───────────────────────────────────────── */
+    header {
+      width: 100%;
+      padding: 28px 32px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    header h1 {
+      font-family: 'Pacifico', cursive;
+      font-size: 2.6rem;
+      font-weight: 400;
+      background: linear-gradient(90deg, #ff2d8a, #ffd700, #ff80c0, #ff2d8a);
+      background-size: 300% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: shimmer 4s linear infinite;
+      text-shadow: none;
+      letter-spacing: 0.01em;
+    }
+
+    @keyframes shimmer {
+      0%   { background-position: 0% center; }
+      100% { background-position: 300% center; }
+    }
+
+    .progress-bar-wrap {
+      width: min(480px, 90vw);
+      height: 6px;
+      background: rgba(255,45,138,0.15);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 10px;
+      border: 1px solid rgba(255,45,138,0.2);
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff2d8a, #ffd700);
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+
+    .progress-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 5px;
+    }
+
+    /* ── ARENA ─────────────────────────────────────────── */
+    #arena {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 28px 16px 48px;
+      gap: 20px;
+    }
+
+    .vs-row {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      width: min(820px, 96vw);
+    }
+
+    .card-wrap {
+      flex: 1;
+      cursor: pointer;
+      border-radius: 20px;
+      overflow: hidden;
+      position: relative;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+      user-select: none;
+    }
+
+    .card-wrap:hover {
+      transform: translateY(-8px) scale(1.015);
+      border-color: var(--accent);
+      box-shadow: 0 12px 50px var(--accent-glow), 0 0 0 1px rgba(255,215,0,0.2);
+    }
+
+    .card-wrap.chosen {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(255,215,0,0.4), 0 12px 40px var(--accent-glow);
+      transform: scale(1.04);
+    }
+
+    .card-wrap.unchosen {
+      opacity: 0.35;
+      transform: scale(0.96);
+    }
+
+    .card-wrap img {
+      width: 100%;
+      height: 340px;
+      object-fit: cover;
+      display: block;
+      pointer-events: none;
+    }
+
+    .card-label {
+      padding: 12px 16px;
+      font-size: 0.82rem;
+      color: var(--pink-light);
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-align: center;
+    }
+
+    .vs-divider {
+      width: 52px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Pacifico', cursive;
+      font-size: 1.3rem;
+      background: linear-gradient(180deg, #ff2d8a, #ffd700);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    /* ── LEADERBOARD ──────────────────────────────────── */
+    #leaderboard {
+      width: min(560px, 94vw);
+      margin: 0 auto 64px;
+      display: none;
+    }
+
+    #leaderboard h2 {
+      font-family: 'Pacifico', cursive;
+      font-size: 1.4rem;
+      font-weight: 400;
+      background: linear-gradient(90deg, #ff2d8a, #ffd700);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .lb-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: rgba(45,0,37,0.8);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 16px;
+      margin-bottom: 8px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .lb-item:hover {
+      border-color: var(--accent);
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
+
+    .lb-rank {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--muted);
+      width: 24px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .lb-rank.top { color: var(--gold); }
+
+    .lb-thumb {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      object-fit: cover;
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+    }
+
+    .lb-info { flex: 1; min-width: 0; }
+
+    .lb-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .lb-elo {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .lb-bar-wrap {
+      width: 80px;
+      height: 4px;
+      background: rgba(255,45,138,0.15);
+      border-radius: 2px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .lb-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff2d8a, #ffd700);
+      border-radius: 2px;
+    }
+
+    /* ── LOCKED LEADERBOARD ───────────────────────────── */
+    #lb-locked {
+      width: min(560px, 94vw);
+      margin: 0 auto 64px;
+      background: rgba(45,0,37,0.6);
+      border: 1px dashed var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      text-align: center;
+    }
+
+    #lb-locked p { font-size: 0.85rem; color: var(--muted); line-height: 1.6; }
+    #lb-locked strong { color: var(--pink-light); }
+
+    /* ── RESET ────────────────────────────────────────── */
+    #reset-btn {
+      display: block;
+      margin: 0 auto 32px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.75rem;
+      padding: 8px 20px;
+      border-radius: 20px;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      transition: border-color 0.2s, color 0.2s, box-shadow 0.2s;
+    }
+
+    #reset-btn:hover {
+      border-color: var(--accent);
+      color: var(--text);
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    /* ── CONFIG NOTICE ────────────────────────────────── */
+    #config-notice {
+      background: rgba(255,45,138,0.08);
+      border: 1px solid rgba(255,45,138,0.25);
+      border-radius: 12px;
+      padding: 18px 24px;
+      max-width: min(820px, 96vw);
+      margin: 12px auto 0;
+      font-size: 0.82rem;
+      line-height: 1.7;
+      color: var(--muted);
+    }
+
+    #config-notice code {
+      background: rgba(255,255,255,0.08);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+
+    #config-notice strong { color: var(--pink-light); }
+
+    @media (max-width: 580px) {
+      header h1 { font-size: 1.8rem; }
+      .card-wrap img { height: 200px; }
+      .vs-divider { width: 28px; font-size: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="sparkle-canvas"></canvas>
+
+<!-- ═══════════════════════════════════════════════════════
+     ✏️  CONFIGURATION — edit this section to set up your images
+     ═══════════════════════════════════════════════════════ -->
+<script>
+  // 1. Replace these with your actual image paths or URLs.
+  //    Paths are relative to index.html, e.g. "images/photo1.jpg"
+  //    Or use full URLs: "https://example.com/photo.jpg"
+  const IMAGE_LIST = [
+    { id:"josh_allen",           src:"images/josh_allen.png",           label:"Josh Allen" },
+    { id:"malik_willis",         src:"images/malik_willis.png",         label:"Malik Willis" },
+    { id:"drake_maye",           src:"images/drake_maye.png",           label:"Drake Maye" },
+    { id:"geno_smith",           src:"images/geno_smith.png",           label:"Geno Smith" },
+    { id:"lamar_jackson",        src:"images/lamar_jackson.png",        label:"Lamar Jackson" },
+    { id:"joe_burrow",           src:"images/joe_burrow.png",           label:"Joe Burrow" },
+    { id:"joe_flacco",           src:"images/joe_flacco.png",           label:"Joe Flacco" },
+    { id:"shedeur_sanders",      src:"images/shedeur_sanders.png",      label:"Shedeur Sanders" },
+    { id:"deshaun_watson",       src:"images/deshaun_watson.png",       label:"Deshaun Watson" },
+    { id:"aaron_rodgers",        src:"images/aaron_rodgers.png",        label:"Aaron Rodgers" },
+    { id:"cj_stroud",            src:"images/cj_stroud.png",            label:"C.J. Stroud" },
+    { id:"daniel_jones",         src:"images/daniel_jones.png",         label:"Daniel Jones" },
+    { id:"anthony_richardson",   src:"images/anthony_richardson.png",   label:"Anthony Richardson Sr." },
+    { id:"trevor_lawrence",      src:"images/trevor_lawrence.png",      label:"Trevor Lawrence" },
+    { id:"cam_ward",             src:"images/cam_ward.png",             label:"Cam Ward" },
+    { id:"mitchell_trubisky",    src:"images/mitchell_trubisky.png",    label:"Mitchell Trubisky" },
+    { id:"bo_nix",               src:"images/bo_nix.png",               label:"Bo Nix" },
+    { id:"patrick_mahomes",      src:"images/patrick_mahomes.png",      label:"Patrick Mahomes" },
+    { id:"justin_fields",        src:"images/justin_fields.png",        label:"Justin Fields" },
+    { id:"kirk_cousins",         src:"images/kirk_cousins.png",         label:"Kirk Cousins" },
+    { id:"fernando_mendoza",     src:"images/fernando_mendoza.png",     label:"Fernando Mendoza" },
+    { id:"justin_herbert",       src:"images/justin_herbert.png",       label:"Justin Herbert" },
+    { id:"dak_prescott",         src:"images/dak_prescott.png",         label:"Dak Prescott" },
+    { id:"jaxson_dart",          src:"images/jaxson_dart.png",          label:"Jaxson Dart" },
+    { id:"jameis_winston",       src:"images/jameis_winston.png",       label:"Jameis Winston" },
+    { id:"jalen_hurts",          src:"images/jalen_hurts.png",          label:"Jalen Hurts" },
+    { id:"jayden_daniels",       src:"images/jayden_daniels.png",       label:"Jayden Daniels" },
+    { id:"marcus_mariota",       src:"images/marcus_mariota.png",       label:"Marcus Mariota" },
+    { id:"caleb_williams",       src:"images/caleb_williams.png",       label:"Caleb Williams" },
+    { id:"jared_goff",           src:"images/jared_goff.png",           label:"Jared Goff" },
+    { id:"jordan_love",          src:"images/jordan_love.png",          label:"Jordan Love" },
+    { id:"kyler_murray",         src:"images/kyler_murray.png",         label:"Kyler Murray" },
+    { id:"jj_mccarthy",          src:"images/jj_mccarthy.png",          label:"J.J. McCarthy" },
+    { id:"michael_penix",        src:"images/michael_penix.png",        label:"Michael Penix Jr." },
+    { id:"tua_tagovailoa",       src:"images/tua_tagovailoa.png",       label:"Tua Tagovailoa" },
+    { id:"bryce_young",          src:"images/bryce_young.png",          label:"Bryce Young" },
+    { id:"tyler_shough",         src:"images/tyler_shough.png",         label:"Tyler Shough" },
+    { id:"spencer_rattler",      src:"images/spencer_rattler.png",      label:"Spencer Rattler" },
+    { id:"baker_mayfield",       src:"images/baker_mayfield.png",       label:"Baker Mayfield" },
+    { id:"jake_browning",        src:"images/jake_browning.png",        label:"Jake Browning" },
+    { id:"jacoby_brissett",      src:"images/jacoby_brissett.png",      label:"Jacoby Brissett" },
+    { id:"gardner_minshew",      src:"images/gardner_minshew.png",      label:"Gardner Minshew II" },
+    { id:"matthew_stafford",     src:"images/matthew_stafford.png",     label:"Matthew Stafford" },
+    { id:"brock_purdy",          src:"images/brock_purdy.png",          label:"Brock Purdy" },
+    { id:"mac_jones",            src:"images/mac_jones.png",            label:"Mac Jones" },
+    { id:"sam_darnold",          src:"images/sam_darnold.png",          label:"Sam Darnold" },
+  ];
+
+  // 2. How many comparisons before the leaderboard unlocks?
+  //    Recommended: at least 1.5–2× the number of images (e.g. 60–80 for 40 images)
+  const MIN_COMPARISONS = 80;
+
+  // 3. ELO K-factor — higher = faster rating changes (32 is standard)
+  const K_FACTOR = 32;
+
+  // 4. Page title shown in the header
+  const PAGE_TITLE = "who is hotter???";
+</script>
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<header>
+  <h1 id="page-title"></h1>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+  </div>
+  <div class="progress-label" id="progress-label"></div>
+</header>
+
+<div id="config-notice">
+  <strong>👋 Setup reminder:</strong> Edit the <code>IMAGE_LIST</code> array at the top of this file to add your images,
+  then put your image files in an <code>images/</code> folder next to <code>index.html</code>.
+  Remove this notice when you're ready to share. See the <strong>README.md</strong> for full instructions.
+</div>
+
+<section id="arena">
+  <div class="vs-row">
+    <div class="card-wrap" id="card-a" onclick="pick('a')">
+      <img id="img-a" src="" alt="Option A" />
+      <div class="card-label" id="label-a"></div>
+    </div>
+    <div class="vs-divider">VS</div>
+    <div class="card-wrap" id="card-b" onclick="pick('b')">
+      <img id="img-b" src="" alt="Option B" />
+      <div class="card-label" id="label-b"></div>
+    </div>
+  </div>
+  <p class="hint">Click the image you prefer</p>
+</section>
+
+<div id="lb-locked">
+  <p id="lb-locked-text"></p>
+</div>
+
+<div id="leaderboard">
+  <h2>Rankings</h2>
+  <div id="lb-list"></div>
+</div>
+
+<button id="reset-btn" onclick="resetAll()">Reset all comparisons</button>
+
+<script>
+  // ── State ──────────────────────────────────────────────
+  const STORAGE_KEY = 'elo_ranker_v1';
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch(e) {}
+    return null;
+  }
+
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function initState() {
+    const ratings = {};
+    const comparisons = {};
+    IMAGE_LIST.forEach(img => {
+      ratings[img.id] = 1000;
+      comparisons[img.id] = 0;
+    });
+    return { ratings, comparisons, totalComparisons: 0, history: [] };
+  }
+
+  // ── ELO ───────────────────────────────────────────────
+  function expected(ra, rb) {
+    return 1 / (1 + Math.pow(10, (rb - ra) / 400));
+  }
+
+  function updateElo(state, winnerId, loserId) {
+    const ra = state.ratings[winnerId];
+    const rb = state.ratings[loserId];
+    const ea = expected(ra, rb);
+    state.ratings[winnerId] = Math.round(ra + K_FACTOR * (1 - ea));
+    state.ratings[loserId]  = Math.round(rb + K_FACTOR * (0 - (1 - ea)));
+    state.comparisons[winnerId] = (state.comparisons[winnerId] || 0) + 1;
+    state.comparisons[loserId]  = (state.comparisons[loserId]  || 0) + 1;
+    state.totalComparisons = (state.totalComparisons || 0) + 1;
+    state.history = state.history || [];
+    state.history.push({ w: winnerId, l: loserId });
+  }
+
+  // ── Pair selection ─────────────────────────────────────
+  // Prioritise images with fewer comparisons; break ties randomly
+  function selectPair(state) {
+    const ids = IMAGE_LIST.map(i => i.id);
+    ids.sort((a, b) => {
+      const diff = (state.comparisons[a] || 0) - (state.comparisons[b] || 0);
+      return diff !== 0 ? diff : Math.random() - 0.5;
+    });
+
+    // Pick the least-compared image, then find a partner it hasn't faced recently
+    const a = ids[0];
+    const recentOpponents = new Set(
+      (state.history || []).slice(-20)
+        .filter(h => h.w === a || h.l === a)
+        .map(h => h.w === a ? h.l : h.w)
+    );
+
+    let b = null;
+    for (let i = 1; i < ids.length; i++) {
+      if (!recentOpponents.has(ids[i])) { b = ids[i]; break; }
+    }
+    if (!b) b = ids[1]; // fallback
+
+    return [a, b];
+  }
+
+  // ── Render ─────────────────────────────────────────────
+  let state;
+  let currentPair = [];
+
+  function getImageById(id) {
+    return IMAGE_LIST.find(i => i.id === id);
+  }
+
+  function renderPair() {
+    const [aId, bId] = selectPair(state);
+    currentPair = [aId, bId];
+
+    const imgA = getImageById(aId);
+    const imgB = getImageById(bId);
+
+    document.getElementById('img-a').src   = imgA.src;
+    document.getElementById('img-a').alt   = imgA.label;
+    document.getElementById('label-a').textContent = imgA.label;
+    document.getElementById('img-b').src   = imgB.src;
+    document.getElementById('img-b').alt   = imgB.label;
+    document.getElementById('label-b').textContent = imgB.label;
+
+    document.getElementById('card-a').className = 'card-wrap';
+    document.getElementById('card-b').className = 'card-wrap';
+  }
+
+  function renderProgress() {
+    const total = state.totalComparisons || 0;
+    const pct = Math.min(100, Math.round((total / MIN_COMPARISONS) * 100));
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-label').textContent =
+      total < MIN_COMPARISONS
+        ? `${total} / ${MIN_COMPARISONS} comparisons to unlock rankings`
+        : `${total} comparisons — rankings live`;
+  }
+
+  function renderLeaderboard() {
+    const total = state.totalComparisons || 0;
+    const locked = document.getElementById('lb-locked');
+    const lb     = document.getElementById('leaderboard');
+
+    if (total < MIN_COMPARISONS) {
+      locked.style.display = 'block';
+      lb.style.display     = 'none';
+      document.getElementById('lb-locked-text').innerHTML =
+        `Rankings unlock after <strong>${MIN_COMPARISONS} comparisons</strong>.<br>
+         You've done <strong>${total}</strong> so far — keep going!`;
+      return;
+    }
+
+    locked.style.display = 'none';
+    lb.style.display     = 'block';
+
+    const sorted = IMAGE_LIST
+      .map(img => ({ ...img, elo: state.ratings[img.id], count: state.comparisons[img.id] || 0 }))
+      .sort((a, b) => b.elo - a.elo);
+
+    const maxElo = sorted[0].elo;
+    const minElo = sorted[sorted.length - 1].elo;
+    const range  = maxElo - minElo || 1;
+
+    const list = document.getElementById('lb-list');
+    list.innerHTML = sorted.map((img, i) => {
+      const barPct = Math.round(((img.elo - minElo) / range) * 100);
+      const rankClass = i < 3 ? 'lb-rank top' : 'lb-rank';
+      return `
+        <div class="lb-item">
+          <div class="${rankClass}">#${i+1}</div>
+          <img class="lb-thumb" src="${img.src}" alt="${img.label}" />
+          <div class="lb-info">
+            <div class="lb-name">${img.label}</div>
+            <div class="lb-elo">ELO ${img.elo} &middot; ${img.count} votes</div>
+          </div>
+          <div class="lb-bar-wrap">
+            <div class="lb-bar-fill" style="width:${barPct}%"></div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function pick(side) {
+    const winnerId = side === 'a' ? currentPair[0] : currentPair[1];
+    const loserId  = side === 'a' ? currentPair[1] : currentPair[0];
+
+    document.getElementById('card-a').className =
+      'card-wrap ' + (side === 'a' ? 'chosen' : 'unchosen');
+    document.getElementById('card-b').className =
+      'card-wrap ' + (side === 'b' ? 'chosen' : 'unchosen');
+
+    updateElo(state, winnerId, loserId);
+    saveState(state);
+
+    setTimeout(() => {
+      renderPair();
+      renderProgress();
+      renderLeaderboard();
+    }, 420);
+  }
+
+  function resetAll() {
+    if (!confirm('Reset all comparisons and ratings? This cannot be undone.')) return;
+    state = initState();
+    saveState(state);
+    renderPair();
+    renderProgress();
+    renderLeaderboard();
+  }
+
+  // ── Boot ───────────────────────────────────────────────
+  document.getElementById('page-title').textContent = PAGE_TITLE;
+
+  const saved = loadState();
+  if (saved &&
+      Object.keys(saved.ratings || {}).length === IMAGE_LIST.length &&
+      IMAGE_LIST.every(img => img.id in (saved.ratings || {}))) {
+    state = saved;
+  } else {
+    state = initState();
+    saveState(state);
+  }
+
+  renderPair();
+  renderProgress();
+  renderLeaderboard();
+</script>
+
+<script>
+  // ── SPARKLE ANIMATION ─────────────────────────────────
+  const canvas = document.getElementById('sparkle-canvas');
+  const ctx = canvas.getContext('2d');
+  const COLORS = ['#ff2d8a','#ffd700','#ff80c0','#fff','#ffaad4','#ffe066'];
+  const SHAPES = ['★','✦','✧','·','✿','♥'];
+
+  let W, H, particles = [];
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function randomParticle() {
+    return {
+      x:     Math.random() * W,
+      y:     Math.random() * H,
+      size:  Math.random() * 14 + 4,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      shape: SHAPES[Math.floor(Math.random() * SHAPES.length)],
+      vx:    (Math.random() - 0.5) * 0.4,
+      vy:    -(Math.random() * 0.6 + 0.2),
+      alpha: Math.random() * 0.5 + 0.15,
+      life:  Math.random() * 200 + 100,
+      age:   0,
+      twinkle: Math.random() * Math.PI * 2,
+    };
+  }
+
+  function init() {
+    resize();
+    particles = Array.from({ length: 80 }, randomParticle);
+    window.addEventListener('resize', resize);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    particles.forEach((p, i) => {
+      p.age++;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.twinkle += 0.05;
+      const fade = p.age < 20 ? p.age / 20 : p.age > p.life - 30 ? (p.life - p.age) / 30 : 1;
+      ctx.save();
+      ctx.globalAlpha = p.alpha * fade * (0.7 + 0.3 * Math.sin(p.twinkle));
+      ctx.fillStyle = p.color;
+      ctx.font = `${p.size}px serif`;
+      ctx.fillText(p.shape, p.x, p.y);
+      ctx.restore();
+      if (p.age >= p.life || p.y < -20) particles[i] = randomParticle();
+    });
+    requestAnimationFrame(draw);
+  }
+
+  init();
+  draw();
+</script>
+
+</body>
+</html>
