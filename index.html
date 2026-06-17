@@ -467,15 +467,21 @@
 
   // ── ELO ───────────────────────────────────────────────
   function expected(ra, rb) {
+
     return 1 / (1 + Math.pow(10, (rb - ra) / 400));
+  }
+
+  function getK(state, id) {
+    const games = state.comparisons[id] || 0;
+    return Math.max(8, 40 * Math.exp(-games / 20));
   }
 
   function updateElo(state, winnerId, loserId) {
     const ra = state.ratings[winnerId];
     const rb = state.ratings[loserId];
     const ea = expected(ra, rb);
-    state.ratings[winnerId] = Math.round(ra + K_FACTOR * (1 - ea));
-    state.ratings[loserId]  = Math.round(rb + K_FACTOR * (0 - (1 - ea)));
+    state.ratings[winnerId] = ra + getK(state, winnerId) * (1 - ea);
+    state.ratings[loserId]  = rb + getK(state, loserId) * (0 - (1 - ea));
     state.comparisons[winnerId] = (state.comparisons[winnerId] || 0) + 1;
     state.comparisons[loserId]  = (state.comparisons[loserId]  || 0) + 1;
     state.totalComparisons = (state.totalComparisons || 0) + 1;
@@ -487,24 +493,37 @@
   // Prioritise images with fewer comparisons; break ties randomly
   function selectPair(state) {
     const ids = IMAGE_LIST.map(i => i.id);
-    ids.sort((a, b) => {
-      const diff = (state.comparisons[a] || 0) - (state.comparisons[b] || 0);
-      return diff !== 0 ? diff : Math.random() - 0.5;
-    });
 
-    // Pick the least-compared image, then find a partner it hasn't faced recently
-    const a = ids[0];
+    // 30% exploration: least-compared items
+    if (Math.random() < 0.30) {
+      ids.sort((a, b) => {
+        const diff = (state.comparisons[a] || 0) - (state.comparisons[b] || 0);
+        return diff !== 0 ? diff : Math.random() - 0.5;
+      });
+
+      const a = ids[0];
+      const candidates = ids.slice(1, 8);
+      const b = candidates[Math.floor(Math.random() * candidates.length)];
+      return [a, b];
+    }
+
+    // 70% exploitation: compare similar ratings
+    const a = ids[Math.floor(Math.random() * ids.length)];
     const recentOpponents = new Set(
       (state.history || []).slice(-20)
         .filter(h => h.w === a || h.l === a)
         .map(h => h.w === a ? h.l : h.w)
     );
 
-    let b = null;
-    for (let i = 1; i < ids.length; i++) {
-      if (!recentOpponents.has(ids[i])) { b = ids[i]; break; }
-    }
-    if (!b) b = ids[1]; // fallback
+    const candidates = ids
+      .filter(id => id !== a && !recentOpponents.has(id))
+      .sort((x, y) =>
+        Math.abs(state.ratings[a] - state.ratings[x]) -
+        Math.abs(state.ratings[a] - state.ratings[y])
+      );
+
+    const top = candidates.slice(0, Math.min(5, candidates.length));
+    const b = top[Math.floor(Math.random() * top.length)] || ids.find(id => id !== a);
 
     return [a, b];
   }
@@ -580,7 +599,7 @@
           <img class="lb-thumb" src="${img.src}" alt="${img.label}" />
           <div class="lb-info">
             <div class="lb-name">${img.label}</div>
-            <div class="lb-elo">ELO ${img.elo} &middot; ${img.count} votes</div>
+            <div class="lb-elo">ELO ${Math.round(img.elo)} &middot; ${img.count} votes</div>
           </div>
           <div class="lb-bar-wrap">
             <div class="lb-bar-fill" style="width:${barPct}%"></div>
