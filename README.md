@@ -1,6 +1,6 @@
 # Image Ranker — ELO Voting Site
 
-A simple website where visitors compare two images side-by-side and pick their favourite.
+A simple website where visitors compare two images side-by-side and pick their favorite.
 After a minimum number of comparisons, a live leaderboard shows all images ranked by ELO score.
 
 ## How it works
