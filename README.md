@@ -1,2 +1,2 @@
 # sevenghosts
-Ranking the hottest NFL quarterbacks ~with science~ 
+Ranking the hottest NFL quarterbacks /~with science/~
