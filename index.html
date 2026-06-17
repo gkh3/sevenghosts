@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -326,6 +327,33 @@
 
     #config-notice strong { color: var(--pink-light); }
 
+    
+#rankings-unlocked-banner {
+  width: min(700px, 94vw);
+  margin: 16px auto;
+  padding: 16px 24px;
+  text-align: center;
+  font-weight: 700;
+  border-radius: 14px;
+  background: linear-gradient(
+    90deg,
+    rgba(255,45,138,0.15),
+    rgba(255,215,0,0.15)
+  );
+  border: 2px solid var(--gold);
+  color: var(--text);
+  box-shadow:
+    0 0 20px rgba(255,215,0,0.25),
+    0 0 40px rgba(255,45,138,0.15);
+  animation: unlockPulse 2s infinite;
+}
+
+@keyframes unlockPulse {
+  0%,100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+
     @media (max-width: 580px) {
       header h1 { font-size: 1.8rem; }
       .card-wrap img { height: 200px; }
@@ -413,6 +441,10 @@
   <div class="progress-label" id="progress-label"></div>
 </header>
 
+<div id="rankings-unlocked-banner" style="display:none;">
+  🎉 Your rankings are ready! Scroll down to see your results.
+</div>
+
 <section id="arena">
   <div class="vs-row">
     <div class="card-wrap" id="card-a" onclick="pick('a')">
@@ -462,7 +494,7 @@
       ratings[img.id] = 1000;
       comparisons[img.id] = 0;
     });
-    return { ratings, comparisons, totalComparisons: 0, history: [] };
+    return { ratings, comparisons, totalComparisons: 0, history: [], rankingsUnlocked: false };
   }
 
   // ── ELO ───────────────────────────────────────────────
@@ -556,6 +588,23 @@
 
   function renderProgress() {
     const total = state.totalComparisons || 0;
+
+    const banner = document.getElementById('rankings-unlocked-banner');
+
+    if (total >= MIN_COMPARISONS && !state.rankingsUnlocked) {
+      state.rankingsUnlocked = true;
+      saveState(state);
+
+      setTimeout(() => {
+        const lb = document.getElementById('leaderboard');
+        if (lb) {
+          lb.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 300);
+    }
+
+    banner.style.display =
+      total >= MIN_COMPARISONS ? 'block' : 'none';
     const pct = Math.min(100, Math.round((total / MIN_COMPARISONS) * 100));
     document.getElementById('progress-fill').style.width = pct + '%';
     document.getElementById('progress-label').textContent =
@@ -599,7 +648,7 @@
           <img class="lb-thumb" src="${img.src}" alt="${img.label}" />
           <div class="lb-info">
             <div class="lb-name">${img.label}</div>
-            <div class="lb-elo">ELO Rating ${Math.round(img.elo)}</div>
+            <div class="lb-elo">ELO ${Math.round(img.elo)} &middot; ${img.count} votes</div>
           </div>
           <div class="lb-bar-wrap">
             <div class="lb-bar-fill" style="width:${barPct}%"></div>
